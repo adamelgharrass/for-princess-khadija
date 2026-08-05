@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>For Princess Khadija</title>
+    
+    <!-- Premium Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+    <!-- Three.js Library for Cinematic 3D Lighting & Objects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        /* --- LUXURY CORE DESIGN SYSTEM --- */
+        :root {
+            --color-bg: #030303;
+            --color-text-main: #F8F5F0;
+            --color-text-muted: #A39D93;
+            --color-gold: #D4AF37;
+            --color-gold-light: #F3E5AB;
+            --color-gold-glow: rgba(212, 175, 55, 0.35);
+            
+            --font-ar: 'Amiri', serif;
+            --font-en: 'Cinzel', serif;
+            --font-en-alt: 'Playfair Display', serif;
+            
+            --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+            
+            --glass-bg: rgba(18, 18, 20, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shine: rgba(255, 255, 255, 0.03);
+        }
+
+        /* --- RESET & PERFORMANCE BASE --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body, html {
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--color-bg);
+            color: var(--color-text-main);
+            overflow: hidden;
+            font-family: var(--font-ar);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- THREE.JS WEBGL CANVAS (3D SCENE BACKGROUND) --- */
+        #webgl-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 1;
+            pointer-events: auto;
+            transition: filter 1.8s var(--ease-cinematic), transform 1.8s var(--ease-cinematic);
+        }
+
+        /* Fake CSS Depth of Field for UI Focus Scenes */
+        #webgl-canvas.dof-blur {
+            filter: blur(12px) brightness(0.6);
+            transform: scale(1.05); /* Prevents dark edges when blurred */
+        }
+
+        /* --- CINEMATIC ATMOSPHERIC OVERLAYS --- */
+        .film-grain {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="n"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23n)"/%3E%3C/svg%3E');
+            opacity: 0.035;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.85) 100%);
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: 50%; left: 50%;
+            width: 90vw; height: 90vw;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle at center, var(--color-gold-glow) 0%, transparent 65%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 2;
+            transition: opacity 4s var(--ease-cinematic);
+            mix-blend-mode: screen;
+        }
+
+        /* --- AUDIO & SOUND DESIGN UI --- */
+        .audio-ctrl {
+            position: fixed;
+            top: calc(env(safe-area-inset-top, 20px) + 20px); 
+            left: calc(env(safe-area-inset-left, 20px) + 20px);
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 2s var(--ease-cinematic), transform 0.3s ease;
+        }
+        .audio-ctrl:active { transform: scale(0.92); }
+        .audio-ctrl svg { width: 18px; height: 18px; fill: var(--color-gold); transition: fill 0.3s ease; }
+
+        /* --- SCENE ARCHITECTURE --- */
+        .scene {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 2.8s var(--ease-cinematic), transform 3s var(--ease-cinematic);
+            transform: scale(0.96) translateZ(0);
+            z-index: 10;
+        }
+
+        .scene.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1) translateZ(0);
+        }
+
+        .scene.exit {
+            opacity: 0;
+            transform: scale(1.04) translateZ(0);
+            pointer-events: none;
+        }
+
+        /* --- LUXURY TYPOGRAPHY --- */
+        .en-title {
+            font-family: var(--font-en);
+            font-size: 2.2rem;
+            letter-spacing: 5px;
+            color: var(--color-text-main);
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .ar-text {
+            font-family: var(--font-ar);
+            font-size: 2.1rem;
+            line-height: 2.5;
+            text-align: center;
+            color: var(--color-text-main);
+            max-width: 800px;
+            padding: 0 30px;
+            text-shadow: 0 4px 25px rgba(0,0,0,0.9);
+        }
+
+        /* --- SCENE 0: GLOWING INITIATOR --- */
+        #scene-0 .glow-dot {
+            width: 14px; height: 14px;
+            background: var(--color-gold);
+            border-radius: 50%;
+            box-shadow: 0 0 25px var(--color-gold), 0 0 50px var(--color-gold-glow);
+            animation: breathe 3.5s infinite alternate var(--ease-cinematic);
+            cursor: pointer;
+        }
+        @keyframes breathe {
+            0% { transform: scale(0.85); opacity: 0.5; }
+            100% { transform: scale(1.25); opacity: 1; }
+        }
+
+        /* --- SCENE 2 & 3: INTERACTIVE 3D CAKE HUD --- */
+        .cake-hud {
+            position: absolute;
+            bottom: 12%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 20;
+        }
+
+        .mic-hint {
+            font-size: 1.1rem;
+            color: var(--color-text-muted);
+            margin-top: 15px;
+            opacity: 0.8;
+            letter-spacing: 0.5px;
+        }
+
+        /* --- SCENE 6: GLASS CARD & TYPEWRITER --- */
+        .glass-card {
+            width: 88%;
+            max-width: 680px;
+            height: 68vh;
+            background: var(--glass-bg);
+            backdrop-filter: blur(35px);
+            -webkit-backdrop-filter: blur(35px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 50px 35px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8), inset 0 1px 0 var(--glass-shine);
+            overflow-y: auto;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.2s ease-out;
+        }
+        .glass-card::-webkit-scrollbar { display: none; }
+        
+        .typewriter-text {
+            font-family: var(--font-ar);
+            font-size: 1.85rem;
+            line-height: 2.7;
+            color: var(--color-text-main);
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            white-space: pre-wrap;
+        }
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.8rem;
+            background: var(--color-gold);
+            vertical-align: middle;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* --- ENDING PETAL --- */
+        .rose-petal {
+            position: absolute;
+            top: -10%;
+            left: 50%;
+            width: 26px; height: 32px;
+            background: linear-gradient(135deg, #700000 0%, #300000 100%);
+            border-radius: 50% 0 50% 50%;
+            box-shadow: inset -3px -3px 8px rgba(0,0,0,0.7), 0 10px 20px rgba(0,0,0,0.4);
+            opacity: 0;
+            z-index: 999;
+            transform: translateX(-50%) rotate(0deg);
+        }
+        .rose-petal.fall {
+            animation: fallingPetal 9s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        @keyframes fallingPetal {
+            0% { top: -10%; transform: translateX(-50%) rotate(0deg); opacity: 1; }
+            30% { transform: translateX(-120%) rotate(60deg); }
+            60% { transform: translateX(40%) rotate(120deg); }
+            80% { transform: translateX(-60%) rotate(180deg); }
+            100% { top: 110%; transform: translateX(-50%) rotate(240deg); opacity: 0; }
+        }
+
+        .signature {
+            font-family: var(--font-en-alt);
+            color: var(--color-text-muted);
+            font-size: 1.05rem;
+            letter-spacing: 2px;
+            margin-top: 45px;
+            text-align: center;
+            opacity: 0.9;
+        }
+
+        /* --- 2D CANVAS PARTICLES --- */
+        #canvas-particles {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 5;
+            transition: filter 1.5s var(--ease-cinematic);
+        }
+        #canvas-particles.dof-blur {
+            filter: blur(4px);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- EXTERNAL AUDIO BGM (Real Music File) -->
+    <audio id="bgMusic" src="audio.mp3" loop preload="auto"></audio>
+
+    <!-- THREE.JS 3D CANVAS -->
+    <canvas id="webgl-canvas" class="dof-blur"></canvas>
+
+    <!-- OVERLAYS & PARTICLES -->
+    <div class="film-grain"></div>
+    <div class="vignette"></div>
+    <div class="ambient-glow" id="ambientGlow"></div>
+    <canvas id="canvas-particles" class="dof-blur"></canvas>
+
+    <!-- SOUND CONTROLLER -->
+    <div class="audio-ctrl" id="audioToggle">
+        <svg viewBox="0 0 24 24" id="audioIcon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    </div>
+
+    <!-- SCENE 0: INITIATOR -->
+    <div class="scene active" id="scene-0">
+        <div class="glow-dot" id="startJourney"></div>
+    </div>
+
+    <!-- SCENE 1: TITLE REVEAL -->
+    <div class="scene" id="scene-1">
+        <h1 class="en-title">For Princess Khadija <span style="color:var(--color-gold)">🤍</span></h1>
+    </div>
+
+    <!-- SCENE 2: LUXURY 3D CAKE & CANDLE -->
+    <div class="scene" id="scene-2">
+        <div class="en-title" style="font-size: 1.4rem; margin-top: -10vh; text-shadow: 0 4px 15px rgba(0,0,0,0.9);">Happy 18th Birthday, Princess Khadija. <span style="color:var(--color-gold)">🤍</span></div>
+        <div class="cake-hud">
+            <div class="ar-text" style="font-size: 1.8rem;">أغمضي عينيكِ...<br>وتمنّي أمنيةً جميلة.</div>
+            <div class="mic-hint" id="micHint">انفخي بلطف، أو المسي الشمعة</div>
+        </div>
+    </div>
+
+    <!-- SCENE 3: AFTER CANDLE EXTINGUISH -->
+    <div class="scene" id="scene-3">
+        <div class="ar-text">كلُّ عامٍ وأنتِ بخير...<br>وأقربُ إلى الأيام التي يستريح فيها قلبكِ.</div>
+    </div>
+
+    <!-- SCENE 4: CINEMATIC ARABIC QUOTES -->
+    <div class="scene" id="scene-4">
+        <div class="ar-text" id="quoteText" style="transition: opacity 1.5s ease, transform 1.5s ease;"></div>
+    </div>
+
+    <!-- SCENE 5: LUXURY GIFT BOX & BLOOMING ROSES -->
+    <div class="scene" id="scene-5">
+        <div class="ar-text" id="giftText" style="position: absolute; bottom: 12%; z-index: 20; transition: opacity 1s ease; text-shadow: 0 4px 15px rgba(0,0,0,0.9);">هذه الهدية...<br>صُنعت من القلب.</div>
+    </div>
+
+    <!-- SCENE 6: FLOATING GLASS CARD & TYPEWRITER -->
+    <div class="scene" id="scene-6">
+        <div class="glass-card" id="glassCard">
+            <div class="typewriter-text"><span id="typewriterTarget"></span><span class="cursor"></span></div>
+        </div>
+    </div>
+
+    <!-- SCENE 7: PEACEFUL ENDING -->
+    <div class="scene" id="scene-7">
+        <div class="rose-petal" id="petal"></div>
+        <div class="ar-text" style="font-size: 2.2rem;">تستحقين...<br>كلَّ الحب والأشياء الجميلة التي تشبهك. <span style="color:var(--color-gold)">🤍</span></div>
+        <div class="signature">Made with Love.<br>For Khadija. <span style="color:var(--color-gold)">🤍</span></div>
+    </div>
+
+    <!-- --- JAVASCRIPT ENGINE & THREE.JS LUXURY RENDERER --- -->
+    <script>
+        /****************************************************************
+         * 1. CONFIGURATION & FINAL LETTER VARIABLE
+         ****************************************************************/
+        const FINAL_LETTER_ARABIC = `إلى أغلى إنسانةٍ على قلبي… خديجة 🤍🫂
+
+لا أعلم أيُّ الأقدار الجميلة تنتظركِ، لكنني أدعو الله أن تكون هذه السنة بدايةً لكل شيءٍ جميلٍ تأخر عنكِ، ولكل فرحةٍ وجدت طريقها إليكِ بعد طول انتظار.
+
+أتمنى أن يأتي اليوم الذي تنظرين فيه إلى نفسكِ بالعين نفسها التي أراكِ بها أنا… بعينٍ ترى قلبًا نقيًا لم تُفسده الحياة، وروحًا جميلةً لم يستطع التعب أن يُطفئ نورها، وإنسانةً تستحق أن تُحَب، وأن تُطمأَن، وأن تعيش حياةً تليق بجمال روحها ونقاء قلبها
+
+وأتمنى أن تكتشفي يومًا أن أجمل ما فيكِ لم يُطفئه التعب، ولم تُغيّره الأيام، ولم تستطع الحياة، مهما اشتدت، أن تنتزعه منكِ. فما رأيته فيكِ كان دائمًا قلبًا نادرًا، لا تُقاس قيمته بما مرَّ به، بل بما بقي فيه من خيرٍ رغم كل ما مرَّ به.
+
+ولهذا… لم تتغيّر مكانتكِ في قلبي يومًا. كنتُ أعرف أن الإنسان حين يشتد عليه التعب قد لا يشبه نفسه، وقد يعجز عن أن يُظهر ما في قلبه كما يتمنى. لذلك لم أكن أنظر إلى صمتكِ أو ابتعادكِ وحدهما، بل كنتُ أحاول دائمًا أن أرى ما وراءهما. وما كنتُ أراه، في كل مرة، هو القلب نفسه الذي أحببتُه منذ البداية… قلبًا طيبًا، ونقيًا، وجميلًا، يستحقُّ أن يُرفَقَ به أكثرَ مما يُلام ويستحق كل الاشياء الجميلة التي تشبهه
+
+فلا تسمحي لأي وجعٍ أن يُقنعكِ يومًا بأنكِ أقلُّ مما أنتِ عليه، أو أن يُنسيكِ قيمتكِ الحقيقية. فأنتِ تستحقين كلَّ حبٍّ صادق، وكلَّ طمأنينةٍ تلامس قلبكِ، وكلَّ خيرٍ يختاركِ قبل أن تبحثي عنه، وتستحقين حياةً تشبه نقاء روحكِ، لا قسوة ما مررتِ به.
+
+ولا أريدكِ أن تشعري يومًا أنكِ مدينةٌ لي بشيء. فما فعلتُه من أجلكِ لم يكن دينًا، ولا طلبًا لمقابل، ولا ترقبًا لرد، ولا صفقةً بين قلبين. كان اختيارًا نابعًا من محبةٍ صادقة، لأنني كنتُ أؤمن دائمًا أن الخير إذا وصل إلى قلبكِ، وصل أثره إلى قلبي أيضًا، وأن كلَّ راحةٍ تسكن روحكِ هي راحةٌ أشعر بها أنا كذلك. لذلك، لا تُثقلي قلبكِ بهذا الشعور… فأجمل ما يمكن أن تمنحيني إياه، وكان وسيبقى دائمًا، هو أن أراكِ بخير
+
+كلُّ عامٍ وأنتِ بخير يا أجمل روحٍ عرفتها، خديجة…
+
+أسأل الله أن يجبر قلبكِ جبرًا يُنسيه كلَّ ما أثقله، وأن يُبدّل كلَّ تعبٍ سكن روحكِ براحةٍ لا تنقطع، وأن يفتح لكِ أبوابًا من الخير لم تكوني تتوقعينها، وأن يرزقكِ طمأنينةً لا يستطيع شيءٌ أن يسلبها منكِ، وأن يجعل القادم من عمركِ أجملَ مما تمنيتِ، وألطفَ مما دعوتِ ودعوتُ، وأكرمَ مما تخيلتِ.
+
+وأسأل الله أن يرزقكِ من الفرح ما يُعيد إلى قلبكِ سلامه، ومن النور ما يبدّد كلَّ عتمةٍ مررتِ بها، وأن يُريكِ من جميل عطائه ما يجعلكِ توقنين أن الله كان يدّخر لكِ خيرًا يستحق كلَّ هذا الصبر
+
+عيدُ ميلادٍ سعيد… يا روحا نقية تستحقُّ الخير أكثر مما تظن، والسعادة أكثر مما تتمنى، والحياة أجمل مما أوهمها تعبُها يومًا.
+
+`;
+
+        const QUOTES = [
+            "بعضُ القلوب خُلِقَت لتُحَب...\nحتى حين تنسى قيمتها...\nوحتى وهي تظنُّ أنها لا تستحق.",
+            "اليوم...\nيبدأ عامٌ جديد لأجمل أميرةٍ\nوقلبٍ يستحقُّ كلَّ الأشياء الجميلة.",
+            "تستحقين...\nكلَّ الطمأنينة،\nوكلَّ الحب،\nوكلَّ الأيام\nالتي تبتسمين فيها من قلبكِ."
+        ];
+
+        /****************************************************************
+         * 2. AUDIO INTEGRATION & PREMIUM SFX ENGINE
+         ****************************************************************/
+        let audioCtx = null;
+        let isMuted = false;
+        let audioFader = null;
+        const bgMusic = document.getElementById('bgMusic');
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Smooth Fade for Background Music
+        function fadeAudio(targetVolume, duration) {
+            clearInterval(audioFader);
+            const steps = 50;
+            const stepTime = duration / steps;
+            const volumeStep = (targetVolume - bgMusic.volume) / steps;
+            
+            audioFader = setInterval(() => {
+                let newVol = bgMusic.volume + volumeStep;
+                if(newVol >= 1) newVol = 1;
+                if(newVol <= 0) newVol = 0;
+                bgMusic.volume = newVol;
+                
+                if(Math.abs(bgMusic.volume - targetVolume) < 0.02) {
+                    bgMusic.volume = targetVolume;
+                    clearInterval(audioFader);
+                }
+            }, stepTime);
+        }
+
+        // Premium UI Sound Effects Synthesizer
+        function playSoundCue(type) {
+            if (isMuted || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const t = audioCtx.currentTime;
+
+            if (type === 'extinguish') {
+                // Soft wind exhale
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t + 1.2);
+                gain.gain.setValueAtTime(0.1, t);
+                gain.gain.linearRampToValueAtTime(0.001, t + 1.2);
+                osc.start(t); osc.stop(t + 1.2);
+            } else if (type === 'giftOpen') {
+                // Premium soft golden chime
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, t);
+                osc.frequency.exponentialRampToValueAtTime(880, t + 0.8);
+                gain.gain.setValueAtTime(0.06, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
+                
+                // Add a secondary bell harmony
+                const osc2 = audioCtx.createOscillator();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(659.25, t);
+                osc2.frequency.exponentialRampToValueAtTime(1318.5, t + 0.8);
+                osc2.connect(gain);
+                osc2.start(t); osc2.stop(t + 2.0);
+                
+                osc.start(t); osc.stop(t + 2.0);
+            } else if (type === 'typeKey') {
+                // Subtle crisp paper/UI touch
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400 + Math.random() * 50, t);
+                gain.gain.setValueAtTime(0.02, t);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+                osc.start(t); osc.stop(t + 0.08);
+            }
+        }
+
+        document.getElementById('audioToggle').addEventListener('click', () => {
+            isMuted = !isMuted;
+            const icon = document.getElementById('audioIcon');
+            
+            if (isMuted) {
+                document.getElementById('audioToggle').style.opacity = '0.4';
+                icon.style.fill = 'var(--color-text-muted)';
+                fadeAudio(0, 1000);
+            } else {
+                document.getElementById('audioToggle').style.opacity = '1';
+                icon.style.fill = 'var(--color-gold)';
+                fadeAudio(0.6, 1000); // Target volume for BGM
+            }
+        });
+
+        /****************************************************************
+         * 3. THREE.JS LUXURY HDR RENDERER (CAKE, CANDLE, GIFT BOX, ROSES)
+         ****************************************************************/
+        let scene3D, camera3D, renderer3D;
+        let cakeGroup, candleFlame3D, flameLight, boxGroup, boxLidGroup, bouquetGroup;
+        let isCandleLit = true;
+        
+        // Materials updated for Physical-Based Rendering (PBR)
+        const velvetCakeMat = new THREE.MeshPhysicalMaterial({
+            color: 0x0a0a0a, roughness: 0.95, metalness: 0.1,
+            clearcoat: 0.05, clearcoatRoughness: 0.8
+        });
+        const premiumGoldMat = new THREE.MeshPhysicalMaterial({
+            color: 0xd4af37, roughness: 0.15, metalness: 1.0,
+            clearcoat: 1.0, clearcoatRoughness: 0.1
+        });
+        const velvetBoxMat = new THREE.MeshPhysicalMaterial({
+            color: 0x08080a, roughness: 0.9, metalness: 0.1,
+            clearcoat: 0.05, clearcoatRoughness: 0.9
+        });
+        const luxuryRoseMat = new THREE.MeshPhysicalMaterial({
+            color: 0x5a0000, roughness: 0.7, metalness: 0.05,
+            clearcoat: 0.1, clearcoatRoughness: 0.5,
+            side: THREE.DoubleSide
+        });
+
+        function initThreeJS() {
+            const canvas = document.getElementById('webgl-canvas');
+            scene3D = new THREE.Scene();
+            
+            // Subtle 3D Fog for natural Depth of Field/Fade into darkness
+            scene3D.fog = new THREE.FogExp2(0x030303, 0.035);
+            
+            camera3D = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera3D.position.set(0, 0, 15);
+
+            renderer3D = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer3D.setSize(window.innerWidth, window.innerHeight);
+            renderer3D.shadowMap.enabled = true;
+            renderer3D.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            // HDR Tone Mapping
+            renderer3D.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer3D.toneMappingExposure = 1.1;
+
+            // --- CINEMATIC HDR LIGHTING SETUP ---
+            const ambient = new THREE.AmbientLight(0xfff0e6, 0.3); // Warm ambient
+            scene3D.add(ambient);
+
+            const hemiLight = new THREE.HemisphereLight(0xffeeb1, 0x080820, 0.4); // Sky/Ground bounce
+            scene3D.add(hemiLight);
+
+            const mainLight = new THREE.DirectionalLight(0xffeedd, 1.8); // Key light
+            mainLight.position.set(5, 12, 8);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 1024;
+            mainLight.shadow.mapSize.height = 1024;
+            mainLight.shadow.bias = -0.001;
+            scene3D.add(mainLight);
+
+            const rimLight = new THREE.DirectionalLight(0x7788ff, 1.2); // Cool cinematic rim light
+            rimLight.position.set(-6, 5, -8);
+            scene3D.add(rimLight);
+
+            const fillLight = new THREE.DirectionalLight(0xd4af37, 0.6); // Gold fill
+            fillLight.position.set(-5, -2, 5);
+            scene3D.add(fillLight);
+
+            build3DCake();
+            build3DGiftAndRoses();
+
+            window.addEventListener('resize', onWindowResize);
+            animate3D();
+        }
+
+        function onWindowResize() {
+            camera3D.aspect = window.innerWidth / window.innerHeight;
+            camera3D.updateProjectionMatrix();
+            renderer3D.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- SCENE 2: LUXURY BLACK VELVET CAKE ---
+        function build3DCake() {
+            cakeGroup = new THREE.Group();
+
+            const cakeMesh = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 2.2, 64), velvetCakeMat);
+            cakeMesh.position.y = -2;
+            cakeMesh.castShadow = true;
+            cakeMesh.receiveShadow = true;
+            cakeGroup.add(cakeMesh);
+
+            const trimBottom = new THREE.Mesh(new THREE.TorusGeometry(2.82, 0.06, 16, 100), premiumGoldMat);
+            trimBottom.rotation.x = Math.PI / 2;
+            trimBottom.position.y = -3.05;
+            cakeGroup.add(trimBottom);
+
+            const trimTop = new THREE.Mesh(new THREE.TorusGeometry(2.82, 0.05, 16, 100), premiumGoldMat);
+            trimTop.rotation.x = Math.PI / 2;
+            trimTop.position.y = -0.92;
+            trimTop.castShadow = true;
+            cakeGroup.add(trimTop);
+
+            // Candle
+            const candleBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 32), premiumGoldMat);
+            candleBase.position.set(0, 0.5, 0);
+            candleBase.castShadow = true;
+            cakeGroup.add(candleBase);
+
+            // Dynamic Flame Geometry
+            const flameGeo = new THREE.SphereGeometry(0.18, 16, 16);
+            flameGeo.scale(1, 2.2, 1);
+            const flameMat = new THREE.MeshBasicMaterial({ color: 0xffbb33, transparent: true, opacity: 0.95 });
+            candleFlame3D = new THREE.Mesh(flameGeo, flameMat);
+            candleFlame3D.position.set(0, 1.4, 0);
+            cakeGroup.add(candleFlame3D);
+
+            flameLight = new THREE.PointLight(0xffaa22, 2.5, 12);
+            flameLight.position.set(0, 1.6, 0);
+            flameLight.castShadow = true;
+            cakeGroup.add(flameLight);
+
+            cakeGroup.position.set(0, 0, 0);
+            cakeGroup.visible = false;
+            scene3D.add(cakeGroup);
+        }
+
+        // --- SCENE 5: VELVET GIFT BOX & BLOOMING ROSES BOUQUET ---
+        function build3DGiftAndRoses() {
+            boxGroup = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.5, 3.5), velvetBoxMat);
+            body.position.y = -1.25;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            boxGroup.add(body);
+
+            const ribbonX = new THREE.Mesh(new THREE.BoxGeometry(3.55, 2.52, 0.45), premiumGoldMat);
+            ribbonX.position.y = -1.25;
+            boxGroup.add(ribbonX);
+
+            boxLidGroup = new THREE.Group();
+            boxLidGroup.position.set(0, 0, -1.75); // Pivot edge
+
+            const lid = new THREE.Mesh(new THREE.BoxGeometry(3.65, 0.6, 3.65), velvetBoxMat);
+            lid.position.set(0, 0.3, 1.75);
+            lid.castShadow = true;
+            boxLidGroup.add(lid);
+
+            const lidRibbon = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.62, 0.45), premiumGoldMat);
+            lidRibbon.position.set(0, 0.3, 1.75);
+            boxLidGroup.add(lidRibbon);
+
+            boxGroup.add(boxLidGroup);
+
+            // Procedural Realistic Bouquet
+            bouquetGroup = new THREE.Group();
+            
+            for (let i = 0; i < 21; i++) {
+                const rose = new THREE.Group();
+                
+                // Rose core
+                const center = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.25, 0.5, 12), luxuryRoseMat);
+                center.position.y = 0.25;
+                rose.add(center);
+
+                // Curled Petals
+                for (let p = 0; p < 8; p++) {
+                    const petalGeo = new THREE.SphereGeometry(0.3, 12, 12);
+                    // Flatten and stretch to look like a petal
+                    petalGeo.scale(1.2, 0.2, 1);
+                    const petal = new THREE.Mesh(petalGeo, luxuryRoseMat);
+                    petal.rotation.x = Math.PI / 3 + Math.random() * 0.2;
+                    petal.rotation.y = (p * Math.PI) / 4;
+                    petal.position.set(Math.cos(p) * 0.2, 0.1, Math.sin(p) * 0.2);
+                    rose.add(petal);
+                }
+
+                // Fibonacci sphere distribution for bouquet shape
+                const phi = Math.acos(-1 + (2 * i) / 21);
+                const theta = Math.sqrt(21 * Math.PI) * phi;
+                rose.position.set(
+                    Math.cos(theta) * Math.sin(phi) * 1.25,
+                    Math.cos(phi) * 0.6 + 0.2,
+                    Math.sin(theta) * Math.sin(phi) * 1.25
+                );
+                
+                // Tilt flowers outward slightly
+                rose.lookAt(new THREE.Vector3(rose.position.x * 2, rose.position.y + 2, rose.position.z * 2));
+                
+                rose.scale.set(0, 0, 0); // Start unbloomed inside box
+                bouquetGroup.add(rose);
+            }
+
+            bouquetGroup.position.set(0, -1.0, 0);
+            boxGroup.add(bouquetGroup);
+
+            boxGroup.position.set(0, -1, 0);
+            boxGroup.visible = false;
+            scene3D.add(boxGroup);
+        }
+
+        // --- 3D ANIMATION LOOP ---
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            const time = Date.now() * 0.0015;
+
+            // Idle Cake Float & Realistic Flame Flicker
+            if (cakeGroup.visible) {
+                cakeGroup.rotation.y = Math.sin(time * 0.4) * 0.1;
+                
+                if (isCandleLit) {
+                    // Flame vertex animation (fake fluid motion)
+                    candleFlame3D.position.x = Math.sin(time * 6) * 0.015;
+                    candleFlame3D.position.z = Math.cos(time * 5) * 0.015;
+                    candleFlame3D.scale.set(1 + Math.sin(time * 18) * 0.05, 2.2 + Math.random() * 0.15, 1 + Math.cos(time * 14) * 0.05);
+                    
+                    // Flickering light
+                    flameLight.intensity = 2.0 + Math.random() * 0.5;
+
+                    // Spark embers
+                    if (Math.random() < 0.08) {
+                        createParticles(window.innerWidth/2 + (Math.random()-0.5)*20, window.innerHeight/2 - 40, '255, 180, 50', 1, 'ember');
+                    }
+                }
+            }
+
+            // Idle Gift Box Motion & Subtle Bouquet Sway
+            if (boxGroup.visible) {
+                boxGroup.rotation.y = Math.sin(time * 0.3) * 0.15;
+                if (isBoxOpened) {
+                    bouquetGroup.rotation.z = Math.sin(time * 0.8) * 0.02;
+                    bouquetGroup.rotation.x = Math.cos(time * 0.6) * 0.015;
+                }
+            }
+
+            renderer3D.render(scene3D, camera3D);
+        }
+
+        /****************************************************************
+         * 4. SCENE TRANSITIONS & STORY ENGINE
+         ****************************************************************/
+        let currentScene = 0;
+        const webglCanvas = document.getElementById('webgl-canvas');
+        const particleCanvas = document.getElementById('canvas-particles');
+
+        function toggleDOFBlur(enable) {
+            if (enable) {
+                webglCanvas.classList.add('dof-blur');
+                particleCanvas.classList.add('dof-blur');
+            } else {
+                webglCanvas.classList.remove('dof-blur');
+                particleCanvas.classList.remove('dof-blur');
+            }
+        }
+
+        function transitionScene(from, to, delay = 0) {
+            setTimeout(() => {
+                const outScene = document.getElementById(`scene-${from}`);
+                const inScene = document.getElementById(`scene-${to}`);
+                
+                if(outScene) {
+                    outScene.classList.remove('active');
+                    outScene.classList.add('exit');
+                }
+                
+                setTimeout(() => {
+                    if(inScene) {
+                        inScene.classList.remove('exit');
+                        inScene.classList.add('active');
+                        triggerSceneLogic(to);
+                    }
+                }, 1800);
+            }, delay);
+        }
+
+        document.getElementById('startJourney').addEventListener('click', () => {
+            initAudio();
+            
+            // Start real BGM
+            bgMusic.volume = 0;
+            bgMusic.play().then(() => {
+                fadeAudio(0.6, 2500); // Fade to 60% volume
+                document.getElementById('audioToggle').style.opacity = '1';
+            }).catch(e => {
+                console.log("Autoplay prevented. Music will start on next interaction.");
+            });
+            
+            transitionScene(0, 1);
+        });
+
+        function triggerSceneLogic(sceneNum) {
+            currentScene = sceneNum;
+            
+            switch(sceneNum) {
+                case 1:
+                    document.getElementById('ambientGlow').style.opacity = '0.35';
+                    toggleDOFBlur(true); // Focus on UI text
+                    transitionScene(1, 2, 4500);
+                    break;
+                
+                case 2:
+                    cakeGroup.visible = true;
+                    toggleDOFBlur(false); // Focus on 3D Cake
+                    initMic();
+                    document.getElementById('ambientGlow').style.opacity = '0.2';
+                    break;
+
+                case 3:
+                    toggleDOFBlur(true); // Blur 3D, Focus UI
+                    transitionScene(3, 4, 5500);
+                    break;
+
+                case 4:
+                    playQuotesSequence();
+                    break;
+
+                case 5:
+                    cakeGroup.visible = false;
+                    boxGroup.visible = true;
+                    toggleDOFBlur(false); // Focus on 3D Gift Box
+                    setupGiftBoxInteraction();
+                    break;
+
+                case 6:
+                    boxGroup.visible = false;
+                    document.getElementById('ambientGlow').style.opacity = '0.55';
+                    toggleDOFBlur(true); // Deep blur on background, focus on Glass Card
+                    setupGlassCardParallax();
+                    setTimeout(startTypewriter, 1200);
+                    break;
+
+                case 7:
+                    document.getElementById('ambientGlow').style.opacity = '0.15';
+                    document.getElementById('petal').classList.add('fall');
+                    break;
+            }
+        }
+
+        /****************************************************************
+         * 5. CANDLE INTERACTION & DETECTOR
+         ****************************************************************/
+        let audioContextMic, analyserMic, microphone;
+
+        async function initMic() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                audioContextMic = new (window.AudioContext || window.webkitAudioContext)();
+                analyserMic = audioContextMic.createAnalyser();
+                microphone = audioContextMic.createMediaStreamSource(stream);
+                microphone.connect(analyserMic);
+                analyserMic.fftSize = 256;
+                const bufferLength = analyserMic.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                function detectBlow() {
+                    if (!isCandleLit) return;
+                    analyserMic.getByteFrequencyData(dataArray);
+                    let sum = 0;
+                    for(let i = 0; i < bufferLength; i++) sum += dataArray[i];
+                    let avg = sum / bufferLength;
+                    
+                    if (avg > 48) {
+                        extinguishCandle();
+                    } else {
+                        requestAnimationFrame(detectBlow);
+                    }
+                }
+                detectBlow();
+            } catch (err) {
+                document.getElementById('micHint').innerText = "المسي الشمعة";
+            }
+        }
+
+        // Tap fallback
+        document.getElementById('webgl-canvas').addEventListener('click', () => {
+            // Play audio if it was blocked initially
+            if (bgMusic.paused && !isMuted) {
+                bgMusic.play().then(() => fadeAudio(0.6, 1500)).catch(e=>{});
+            }
+            if (currentScene === 2 && isCandleLit) extinguishCandle();
+        });
+
+        function extinguishCandle() {
+            if (!isCandleLit) return;
+            isCandleLit = false;
+            
+            playSoundCue('extinguish');
+
+            candleFlame3D.visible = false;
+            flameLight.intensity = 0;
+
+            // Smoke & golden ember particles
+            createParticles(window.innerWidth / 2, window.innerHeight / 2 - 40, '200,200,200', 40, 'smoke');
+            createParticles(window.innerWidth / 2, window.innerHeight / 2 - 40, '255,180,50', 25, 'ember');
+
+            document.getElementById('ambientGlow').style.opacity = '0.5';
+
+            if(audioContextMic) audioContextMic.close();
+            
+            transitionScene(2, 3, 1500);
+        }
+
+        /****************************************************************
+         * 6. QUOTES SEQUENCE
+         ****************************************************************/
+        function playQuotesSequence() {
+            const quoteEl = document.getElementById('quoteText');
+            let qIndex = 0;
+
+            function nextQuote() {
+                if(qIndex < QUOTES.length) {
+                    quoteEl.style.opacity = '0';
+                    quoteEl.style.transform = 'translateY(15px)';
+                    
+                    setTimeout(() => {
+                        quoteEl.innerText = QUOTES[qIndex];
+                        quoteEl.style.opacity = '1';
+                        quoteEl.style.transform = 'translateY(0)';
+                        qIndex++;
+                        setTimeout(nextQuote, 5200);
+                    }, 1200);
+                } else {
+                    transitionScene(4, 5, 1000);
+                }
+            }
+            nextQuote();
+        }
+
+        /****************************************************************
+         * 7. GIFT BOX OPENING & BOUQUET BLOOM (WITH PHYSICS)
+         ****************************************************************/
+        let isBoxOpened = false;
+
+        function setupGiftBoxInteraction() {
+            const canvas = document.getElementById('webgl-canvas');
+            
+            const handleBoxClick = () => {
+                if (currentScene !== 5 || isBoxOpened) return;
+                isBoxOpened = true;
+
+                playSoundCue('giftOpen');
+                document.getElementById('giftText').style.opacity = '0';
+
+                // Golden Magic Particle Burst
+                createParticles(window.innerWidth / 2, window.innerHeight / 2, '212, 175, 55', 80, 'gold');
+
+                // Smooth Physics-based 3D Lid Opening Animation (Spring Bounce)
+                let lidVel = 0;
+                let angle = 0;
+                const targetAngle = Math.PI * 0.65;
+                
+                function openLid() {
+                    let force = (targetAngle - angle) * 0.08; // Spring strength
+                    lidVel += force;
+                    lidVel *= 0.85; // Friction
+                    angle += lidVel;
+                    boxLidGroup.rotation.x = -angle;
+                    
+                    if (Math.abs(lidVel) > 0.001 || Math.abs(targetAngle - angle) > 0.001) {
+                        requestAnimationFrame(openLid);
+                    }
+                }
+                openLid();
+
+                // Smooth Ease-Out Bloom Roses Bouquet upward
+                setTimeout(() => {
+                    let scaleProgress = 0;
+                    function bloomBouquet() {
+                        if (scaleProgress < 1) {
+                            // Ease out formula
+                            scaleProgress += (1 - scaleProgress) * 0.04 + 0.005;
+                            if (scaleProgress > 1) scaleProgress = 1;
+
+                            bouquetGroup.position.y = -0.8 + scaleProgress * 1.8;
+                            
+                            bouquetGroup.children.forEach(rose => {
+                                rose.scale.set(scaleProgress, scaleProgress, scaleProgress);
+                            });
+                            
+                            requestAnimationFrame(bloomBouquet);
+                        }
+                    }
+                    bloomBouquet();
+                    document.getElementById('ambientGlow').style.opacity = '0.7';
+
+                    setTimeout(() => {
+                        transitionScene(5, 6, 3500);
+                    }, 4500);
+                }, 700);
+            };
+
+            canvas.addEventListener('click', handleBoxClick);
+        }
+
+        /****************************************************************
+         * 8. GLASS CARD & TYPEWRITER ENGINE
+         ****************************************************************/
+        function setupGlassCardParallax() {
+            const card = document.getElementById('glassCard');
+            
+            window.addEventListener('deviceorientation', (e) => {
+                if (currentScene !== 6) return;
+                const tiltX = Math.min(Math.max(e.beta - 45, -15), 15);
+                const tiltY = Math.min(Math.max(e.gamma, -15), 15);
+                card.style.transform = `rotateX(${-tiltX * 0.4}deg) rotateY(${tiltY * 0.4}deg)`;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (currentScene !== 6) return;
+                const xAxis = (window.innerWidth / 2 - e.pageX) / 30;
+                const yAxis = (window.innerHeight / 2 - e.pageY) / 30;
+                card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+            });
+        }
+
+        function startTypewriter() {
+            const target = document.getElementById('typewriterTarget');
+            const text = FINAL_LETTER_ARABIC;
+            let i = 0;
+            const card = document.getElementById('glassCard');
+
+            function type() {
+                if (i < text.length) {
+                    const char = text.charAt(i);
+                    target.innerHTML += char === '\n' ? '<br>' : char;
+                    i++;
+                    
+                    card.scrollTop = card.scrollHeight;
+                    if (Math.random() > 0.4) playSoundCue('typeKey');
+
+                    let speed = 40 + Math.random() * 30;
+                    if (char === '،' || char === '.') speed += 250;
+                    if (char === '\n') speed += 450;
+
+                    setTimeout(type, speed);
+                } else {
+                    setTimeout(() => {
+                        document.querySelector('.cursor').style.display = 'none';
+                        transitionScene(6, 7, 2500);
+                    }, 4500);
+                }
+            }
+            type();
+        }
+
+        /****************************************************************
+         * 9. 2D CANVAS PARTICLE SYSTEM (SMOKE, EMBERS, GOLD MAGIC)
+         ****************************************************************/
+        const canvas2D = document.getElementById('canvas-particles');
+        const ctx2D = canvas2D.getContext('2d');
+        let particles = [];
+
+        function resize2DCanvas() {
+            canvas2D.width = window.innerWidth;
+            canvas2D.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize2DCanvas);
+        resize2DCanvas();
+
+        class Particle {
+            constructor(x, y, color, type) {
+                this.x = x; this.y = y; this.color = color; this.type = type;
+                this.alpha = 1; this.gravity = 0;
+                
+                if (type === 'smoke') {
+                    this.vx = (Math.random() - 0.5) * 1;
+                    this.vy = -Math.random() * 1.5 - 0.5; // Drift up
+                    this.size = Math.random() * 4 + 2;
+                    this.decay = Math.random() * 0.006 + 0.004;
+                } else if (type === 'ember') {
+                    this.vx = (Math.random() - 0.5) * 2;
+                    this.vy = -Math.random() * 2.5 - 1.0;
+                    this.size = Math.random() * 1.5 + 0.5;
+                    this.decay = Math.random() * 0.02 + 0.01;
+                } else { // 'gold' magic
+                    this.vx = (Math.random() - 0.5) * 5;
+                    this.vy = (Math.random() - 0.5) * 5 - 2;
+                    this.size = Math.random() * 2.5 + 1;
+                    this.decay = Math.random() * 0.012 + 0.005;
+                    this.gravity = 0.06;
+                }
+            }
+            update() {
+                if (this.type === 'gold') this.vy += this.gravity;
+                if (this.type === 'smoke') this.size += 0.04; // Expand slowly
+                if (this.type === 'ember') this.vx += (Math.random() - 0.5) * 0.5; // Flutter
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+            draw() {
+                ctx2D.save();
+                ctx2D.globalAlpha = Math.max(0, this.alpha);
+                ctx2D.beginPath();
+                ctx2D.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx2D.fillStyle = `rgb(${this.color})`;
+                if (this.type !== 'smoke') {
+                    ctx2D.shadowBlur = 12;
+                    ctx2D.shadowColor = `rgb(${this.color})`;
+                }
+                ctx2D.fill();
+                ctx2D.restore();
+            }
+        }
+
+        function createParticles(x, y, color, count, type) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color, type));
+            }
+        }
+
+        function animateParticles() {
+            ctx2D.clearRect(0, 0, canvas2D.width, canvas2D.height);
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+            requestAnimationFrame(animateParticles);
+        }
+
+        // Initialize Engine
+        window.addEventListener('DOMContentLoaded', () => {
+            initThreeJS();
+            animateParticles();
+        });
+    </script>
+</body>
+</html>
