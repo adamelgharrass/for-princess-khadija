@@ -851,14 +851,28 @@
         document.getElementById('startJourney').addEventListener('click', () => {
             initAudio();
             
-            bgMusic.volume = 0;
-            bgMusic.play().then(() => {
-                fadeAudio(0.6, 2500);
-                document.getElementById('audioToggle').style.opacity = '1';
-            }).catch(e => {
-                console.log("Autoplay prevented.");
-            });
+            // Isolate audio playback so failures do NOT block the scene transition
+            try {
+                bgMusic.volume = 0;
+                const playPromise = bgMusic.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        fadeAudio(0.6, 2500);
+                        document.getElementById('audioToggle').style.opacity = '1';
+                    }).catch(e => {
+                        console.log("Autoplay prevented or audio unavailable:", e);
+                    });
+                } else {
+                    // Fallback for older browsers
+                    fadeAudio(0.6, 2500);
+                    document.getElementById('audioToggle').style.opacity = '1';
+                }
+            } catch (error) {
+                console.warn("Audio execution error:", error);
+            }
             
+            // This will now ALWAYS execute, even if audio/mic is blocked
             transitionScene(0, 1);
         });
 
@@ -948,9 +962,16 @@
         };
 
         const handlePointerDown = (event) => {
-            // Unmute instantly
+            // Unmute instantly (Safely wrapped)
             if (bgMusic.paused && !isMuted) {
-                bgMusic.play().then(() => fadeAudio(0.6, 1000)).catch(()=>{});
+                try {
+                    const playPromise = bgMusic.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => fadeAudio(0.6, 1000)).catch(()=>{});
+                    }
+                } catch(error) {
+                    // Ignore audio errors silently on pointerdown
+                }
             }
 
             // Do not block DOM buttons
