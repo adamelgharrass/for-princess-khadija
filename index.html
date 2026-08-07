@@ -187,6 +187,13 @@
             animation: breathe 3.5s infinite alternate var(--ease-cinematic);
             cursor: pointer;
             pointer-events: auto;
+
+            position: relative;
+            z-index: 100000;
+            pointer-events: auto;
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
         }
         @keyframes breathe {
             0% { transform: scale(0.85); opacity: 0.5; }
@@ -823,6 +830,39 @@
         }
 
         function transitionScene(from, to, delay = 0) {
+
+    setTimeout(() => {
+
+        const outScene = document.getElementById(`scene-${from}`);
+        const inScene = document.getElementById(`scene-${to}`);
+
+        console.log("Transition:", from, "→", to);
+
+        if (!inScene) {
+            console.error("Scene not found:", `scene-${to}`);
+            return;
+        }
+
+        if (outScene) {
+            outScene.classList.remove('active');
+            outScene.classList.add('exit');
+        }
+
+        setTimeout(() => {
+
+            inScene.classList.remove('exit');
+            inScene.classList.add('active');
+
+            currentScene = to;
+
+            console.log("Now showing:", `scene-${to}`);
+
+            triggerSceneLogic(to);
+
+        }, 100);
+
+    }, delay);
+}
             console.log(`[Transition] Executing transition from scene-${from} to scene-${to} with delay ${delay}ms`);
             setTimeout(() => {
                 const outScene = document.getElementById(`scene-${from}`);
@@ -847,6 +887,9 @@
         let hasJourneyStarted = false;
         const startBtn = document.getElementById('startJourney');
 
+        startBtn.style.pointerEvents = 'auto';
+startBtn.style.touchAction = 'manipulation';
+      
         const startSequenceHandler = (e) => {
             // Explicitly stop propagation to prevent any global pointer/touch handlers from intercepting
             if (e) {
@@ -864,35 +907,76 @@
             initAudio();
             
             try {
-                bgMusic.volume = 0;
-                const playPromise = bgMusic.play();
-                
-                if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log("[Audio] bgMusic.play() succeeded.");
-                        fadeAudio(0.6, 2500);
-                        document.getElementById('audioToggle').style.opacity = '1';
-                    }).catch(err => {
-                        console.warn("[Audio] bgMusic.play() failed:", err);
-                    });
-                } else {
-                    fadeAudio(0.6, 2500);
-                    document.getElementById('audioToggle').style.opacity = '1';
-                }
-            } catch (err) {
-                console.warn("[Audio] Exception caught during play:", err);
-            }
+    bgMusic.volume = 0;
+    bgMusic.play().then(() => {
+        fadeAudio(0.6, 2500);
+        document.getElementById('audioToggle').style.opacity = '1';
+    }).catch(() => {});
+} catch (err) {}
+
+setTimeout(() => {
+    const scene0 = document.getElementById('scene-0');
+    const scene1 = document.getElementById('scene-1');
+
+    scene0.classList.remove('active');
+    scene0.classList.add('exit');
+
+    scene1.classList.remove('exit');
+    scene1.classList.add('active');
+
+    currentScene = 1;
+    triggerSceneLogic(1);
+}, 100);
             
-            // Guaranteed scene transition regardless of audio outcome
-            console.log("[StartJourney] Initiating transitionScene(0, 1)...");
-            transitionScene(0, 1);
-        };
+    };
 
         // Attach distinct single reliable pointer events with stopPropagation
-        startBtn.addEventListener('pointerdown', startSequenceHandler);
-        startBtn.addEventListener('touchstart', startSequenceHandler, { passive: false });
-        startBtn.addEventListener('click', startSequenceHandler);
+        startBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
 
+    if (hasJourneyStarted) return;
+    hasJourneyStarted = true;
+
+    console.log("START BUTTON WORKS");
+
+    initAudio();
+
+    bgMusic.volume = 0;
+
+    bgMusic.play()
+        .then(() => {
+            fadeAudio(0.6, 2500);
+            document.getElementById('audioToggle').style.opacity = '1';
+        })
+        .catch(err => {
+            console.log("Audio:", err);
+        });
+
+    // إخفاء المشهد الأول فورًا
+    const scene0 = document.getElementById('scene-0');
+    const scene1 = document.getElementById('scene-1');
+
+    scene0.classList.remove('active');
+    scene0.classList.add('exit');
+
+    // إظهار المشهد الثاني
+    setTimeout(() => {
+        scene1.classList.remove('exit');
+        scene1.classList.add('active');
+
+        currentScene = 1;
+
+        // تشغيل منطق Scene 1
+        document.getElementById('ambientGlow').style.opacity = '0.35';
+        toggleDOFBlur(true);
+
+        setTimeout(() => {
+            transitionScene(1, '1-5');
+        }, 4000);
+
+    }, 1800);
+});
         // Manual Buttons logic
         document.getElementById('btn-scene5').addEventListener('click', () => {
             document.getElementById('btn-scene5').style.opacity = '0';
@@ -979,7 +1063,9 @@
         };
 
         const handlePointerDown = (event) => {
-            if (currentScene === 0) return; // Scene 0 has its own handler and z-index isolation
+            if (currentScene === 0) {
+    return;
+}
 
             if (bgMusic.paused && !isMuted) {
                 try {
