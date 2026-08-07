@@ -917,9 +917,9 @@
             currentScene = sceneIndex;
             
             if (sceneIndex === 1) {
-                setTimeout(() => transitionScene(1, 1.5, 0), 4000);
+                setTimeout(() => transitionScene(1, '1-5', 0), 4000);
             } 
-            else if (sceneIndex === 1.5) {
+            else if (sceneIndex === '1-5') {
                 const c1 = document.getElementById('cine-1');
                 const c2 = document.getElementById('cine-2');
                 const c3 = document.getElementById('cine-3');
@@ -931,7 +931,7 @@
                 setTimeout(() => c2.classList.remove('show'), 8000);
                 
                 setTimeout(() => c3.classList.add('show'), 9500);
-                setTimeout(() => transitionScene(1.5, 2, 6000), 10000);
+                setTimeout(() => transitionScene('1-5', 2, 6000), 10000);
             }
             else if (sceneIndex === 2) {
                 document.getElementById('webgl-canvas').classList.remove('dof-blur');
