@@ -45,12 +45,14 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* Fixed viewport setup for precise 3D centering and iOS layout stability */
         body, html {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             background-color: var(--color-bg);
             color: var(--color-text-main);
             overflow: hidden;
+            position: fixed;
             font-family: var(--font-ar);
             user-select: none;
             -webkit-user-select: none;
@@ -58,9 +60,9 @@
 
         /* --- THREE.JS WEBGL CANVAS (3D SCENE BACKGROUND) --- */
         #webgl-canvas {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             z-index: 1;
             pointer-events: auto;
             touch-action: none;
@@ -74,8 +76,9 @@
 
         /* --- CINEMATIC ATMOSPHERIC OVERLAYS --- */
         .film-grain {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             background-image: url('data:image/svg+xml;utf8,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="n"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23n)"/%3E%3C/svg%3E');
             opacity: 0.035;
             pointer-events: none;
@@ -83,15 +86,16 @@
         }
 
         .vignette {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             background: radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.85) 100%);
             pointer-events: none;
             z-index: 9998;
         }
 
         .ambient-glow {
-            position: fixed;
+            position: absolute;
             top: 50%; left: 50%;
             width: 90vw; height: 90vw;
             transform: translate(-50%, -50%);
@@ -128,7 +132,8 @@
         /* --- SCENE ARCHITECTURE --- */
         .scene {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -190,7 +195,6 @@
 
             position: relative;
             z-index: 100000;
-            pointer-events: auto;
             touch-action: manipulation;
             -webkit-user-select: none;
             user-select: none;
@@ -295,6 +299,7 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             z-index: 100;
+            touch-action: manipulation;
         }
         .advance-btn:active {
             transform: scale(0.95);
@@ -304,7 +309,8 @@
         /* --- SCENE 7: CINEMATIC MEMORY BACKGROUND --- */
         .memory-bg {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             background-image: url('أجمل_وأفضل_إنسانة_أحبك.jpeg');
             background-size: cover;
             background-position: center;
@@ -314,7 +320,8 @@
         }
         .memory-overlay {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             background: linear-gradient(to bottom, rgba(3,3,3,0.65), rgba(3,3,3,0.95));
             z-index: 1;
         }
@@ -331,8 +338,9 @@
 
         /* --- 2D CANVAS PARTICLES --- */
         #canvas-particles {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100%; height: 100%;
             pointer-events: none;
             z-index: 5;
             transition: filter 1.5s var(--ease-cinematic);
@@ -584,6 +592,7 @@
             
             camera3D = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera3D.position.set(0, 0, 15);
+            camera3D.lookAt(0, 0, 0);
 
             renderer3D = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
             renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -620,6 +629,8 @@
             build3DGiftAndRoses();
 
             window.addEventListener('resize', onWindowResize);
+            // Force immediate layout stabilization
+            onWindowResize();
             animate3D();
         }
 
@@ -829,168 +840,82 @@
             }
         }
 
+        // Cleaned up, authoritative transition function to replace duplicates
         function transitionScene(from, to, delay = 0) {
-
-    setTimeout(() => {
-
-        const outScene = document.getElementById(`scene-${from}`);
-        const inScene = document.getElementById(`scene-${to}`);
-
-        console.log("Transition:", from, "→", to);
-
-        if (!inScene) {
-            console.error("Scene not found:", `scene-${to}`);
-            return;
-        }
-
-        if (outScene) {
-            outScene.classList.remove('active');
-            outScene.classList.add('exit');
-        }
-
-        setTimeout(() => {
-
-            inScene.classList.remove('exit');
-            inScene.classList.add('active');
-
-            currentScene = to;
-
-            console.log("Now showing:", `scene-${to}`);
-
-            triggerSceneLogic(to);
-
-        }, 100);
-
-    }, delay);
-}
-            console.log(`[Transition] Executing transition from scene-${from} to scene-${to} with delay ${delay}ms`);
             setTimeout(() => {
                 const outScene = document.getElementById(`scene-${from}`);
                 const inScene = document.getElementById(`scene-${to}`);
                 
-                if(outScene) {
+                if (outScene) {
                     outScene.classList.remove('active');
                     outScene.classList.add('exit');
                 }
                 
                 setTimeout(() => {
-                    if(inScene) {
+                    if (inScene) {
                         inScene.classList.remove('exit');
                         inScene.classList.add('active');
                         triggerSceneLogic(to);
                     }
-                }, 1800);
+                }, 1200); // Allow outScene to fade before activating inScene
             }, delay);
         }
 
-        // --- DIRECT ISOLATED HANDLER FOR YELLOW DOT ---
-        let hasJourneyStarted = false;
+        // --- SINGLE RELIABLE HANDLER FOR YELLOW DOT ---
         const startBtn = document.getElementById('startJourney');
+        let hasJourneyStarted = false;
 
-        startBtn.style.pointerEvents = 'auto';
-startBtn.style.touchAction = 'manipulation';
-      
-        const startSequenceHandler = (e) => {
-            // Explicitly stop propagation to prevent any global pointer/touch handlers from intercepting
+        function handleStartJourney(e) {
             if (e) {
+                e.preventDefault();
                 e.stopPropagation();
-                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
             }
 
-            if (hasJourneyStarted) {
-                console.log("[StartJourney] Already started, ignoring duplicate touch/click.");
-                return;
-            }
+            if (hasJourneyStarted) return;
             hasJourneyStarted = true;
-            console.log("[StartJourney] Yellow dot successfully touched/clicked!");
 
             initAudio();
-            
-            try {
-    bgMusic.volume = 0;
-    bgMusic.play().then(() => {
-        fadeAudio(0.6, 2500);
-        document.getElementById('audioToggle').style.opacity = '1';
-    }).catch(() => {});
-} catch (err) {}
+            bgMusic.volume = 0;
 
-setTimeout(() => {
-    const scene0 = document.getElementById('scene-0');
-    const scene1 = document.getElementById('scene-1');
+            const playPromise = bgMusic.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    fadeAudio(0.6, 2500);
+                    document.getElementById('audioToggle').style.opacity = '1';
+                }).catch(err => {
+                    console.log("Audio autoplay prevented:", err);
+                });
+            }
 
-    scene0.classList.remove('active');
-    scene0.classList.add('exit');
+            transitionScene(0, 1, 0);
+        }
 
-    scene1.classList.remove('exit');
-    scene1.classList.add('active');
+        // Bind cleanly to click and touchstart to satisfy Safari Autoplay
+        startBtn.addEventListener('click', handleStartJourney);
+        startBtn.addEventListener('touchstart', handleStartJourney, { passive: false });
 
-    currentScene = 1;
-    triggerSceneLogic(1);
-}, 100);
-            
-    };
 
-        // Attach distinct single reliable pointer events with stopPropagation
-        startBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
+        // Clean generic binder for transition buttons to avoid interference
+        function bindAdvanceButton(btnId, fromScene, toScene) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const handler = (e) => {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                btn.style.opacity = '0';
+                btn.style.pointerEvents = 'none';
+                transitionScene(fromScene, toScene, 0);
+            };
+            btn.addEventListener('click', handler);
+            btn.addEventListener('touchstart', handler, { passive: false });
+        }
 
-    if (hasJourneyStarted) return;
-    hasJourneyStarted = true;
-
-    console.log("START BUTTON WORKS");
-
-    initAudio();
-
-    bgMusic.volume = 0;
-
-    bgMusic.play()
-        .then(() => {
-            fadeAudio(0.6, 2500);
-            document.getElementById('audioToggle').style.opacity = '1';
-        })
-        .catch(err => {
-            console.log("Audio:", err);
-        });
-
-    // إخفاء المشهد الأول فورًا
-    const scene0 = document.getElementById('scene-0');
-    const scene1 = document.getElementById('scene-1');
-
-    scene0.classList.remove('active');
-    scene0.classList.add('exit');
-
-    // إظهار المشهد الثاني
-    setTimeout(() => {
-        scene1.classList.remove('exit');
-        scene1.classList.add('active');
-
-        currentScene = 1;
-
-        // تشغيل منطق Scene 1
-        document.getElementById('ambientGlow').style.opacity = '0.35';
-        toggleDOFBlur(true);
-
-        setTimeout(() => {
-            transitionScene(1, '1-5');
-        }, 4000);
-
-    }, 1800);
-});
-        // Manual Buttons logic
-        document.getElementById('btn-scene5').addEventListener('click', () => {
-            document.getElementById('btn-scene5').style.opacity = '0';
-            document.getElementById('btn-scene5').style.pointerEvents = 'none';
-            transitionScene(5, 6);
-        });
-        document.getElementById('btn-scene6').addEventListener('click', () => {
-            document.getElementById('btn-scene6').style.opacity = '0';
-            document.getElementById('btn-scene6').style.pointerEvents = 'none';
-            transitionScene(6, 7);
-        });
+        bindAdvanceButton('btn-scene5', 5, 6);
+        bindAdvanceButton('btn-scene6', 6, 7);
 
         function triggerSceneLogic(sceneNum) {
-            console.log(`[SceneLogic] Entered scene: ${sceneNum}`);
             currentScene = sceneNum;
             
             if (sceneNum === 1) {
@@ -1063,9 +988,12 @@ setTimeout(() => {
         };
 
         const handlePointerDown = (event) => {
-            if (currentScene === 0) {
-    return;
-}
+            if (currentScene === 0) return;
+
+            // Immediately exit if the user tapped a UI button to avoid intercepting HTML interaction
+            if (event.target.tagName.toLowerCase() === 'button' || event.target.closest('.advance-btn')) {
+                return;
+            }
 
             if (bgMusic.paused && !isMuted) {
                 try {
@@ -1075,8 +1003,6 @@ setTimeout(() => {
                     }
                 } catch(error) {}
             }
-
-            if (event.target.closest('.advance-btn')) return;
 
             const clientX = getEventX(event);
             let clientY = event.touches ? event.touches[0].clientY : event.clientY;
