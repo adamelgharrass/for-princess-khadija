@@ -295,8 +295,8 @@
             cursor: pointer;
             transition: all 0.5s ease;
             margin-top: 25px;
-            pointer-events: none;
-            opacity: 0;
+            pointer-events: auto;
+            opacity: 1;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             z-index: 100000;
@@ -632,7 +632,6 @@
             build3DGiftAndRoses();
 
             window.addEventListener('resize', onWindowResize);
-            // Force immediate layout stabilization
             onWindowResize();
             animate3D();
         }
@@ -642,7 +641,6 @@
             const h = window.innerHeight;
             camera3D.aspect = w / h;
             
-            // Fix 3: Keep elements centered correctly on mobile portrait views
             if (camera3D.aspect < 1) {
                 camera3D.position.z = 15 / Math.sqrt(camera3D.aspect);
             } else {
@@ -789,7 +787,6 @@
                 isBouquetLoaded = true;
             }, undefined, (error) => {
                 console.error("Failed to load flower_bouquet.glb.", error);
-                // Fix: Allow interaction even if the 3D asset fails to load
                 isBouquetLoaded = true; 
             });
 
@@ -889,7 +886,6 @@
         const activeTransitions = {};
 
         function transitionScene(from, to, delay = 0) {
-            // Fix: Robust deduplication of transitions
             const transKey = `${from}_${to}`;
             if (activeTransitions[transKey]) return;
             activeTransitions[transKey] = true;
@@ -1107,12 +1103,6 @@
                 if (scale >= 1.0) {
                     bouquetContainer.scale.set(1, 1, 1);
                     clearInterval(growBouquet);
-                    
-                    setTimeout(() => {
-                        const btn = document.getElementById('btn-scene5');
-                        btn.style.opacity = '1';
-                        btn.style.pointerEvents = 'auto'; // ensure clickability
-                    }, 1500);
                 }
             }, 25);
         }
@@ -1140,11 +1130,6 @@
                     setTimeout(typeChar, delay);
                 } else {
                     card.scrollTop = card.scrollHeight;
-                    setTimeout(() => {
-                        const btn = document.getElementById('btn-scene6');
-                        btn.style.opacity = '1';
-                        btn.style.pointerEvents = 'auto';
-                    }, 2000);
                 }
             }
             setTimeout(typeChar, 1000);
@@ -1158,7 +1143,6 @@
         const handlePointerDown = (event) => {
             if (currentScene === 0) return;
 
-            // Fix 8 & 9: Strictly isolate HTML UI events from Three.js raycasting
             if (event.target !== webglCanvas) {
                 return;
             }
@@ -1194,7 +1178,6 @@
         window.addEventListener('pointerdown', handlePointerDown);
         window.addEventListener('touchstart', handlePointerDown, { passive: true });
 
-        // --- FIX 5, 6, 7 & 10: Cleanly bind advance buttons via standard click ---
         function bindAdvanceButton(btnId, fromScene, toScene) {
             const btn = document.getElementById(btnId);
             if (!btn) return;
@@ -1206,8 +1189,6 @@
                 if (btn.dataset.clicked) return;
                 btn.dataset.clicked = "true";
                 
-                btn.style.opacity = '0';
-                btn.style.pointerEvents = 'none';
                 transitionScene(fromScene, toScene, 0);
             });
         }
@@ -1244,11 +1225,9 @@
                 });
             }
 
-            // Fix 2: Always transition regardless of audio failure
             transitionScene(0, 1, 0); 
         }
 
-        // Fix 1 & 10: Only use click event, iOS Safari `touch-action: manipulation` prevents delays
         startBtn.addEventListener('click', handleStartJourney);
 
     </script>
