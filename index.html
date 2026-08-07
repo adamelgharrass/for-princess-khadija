@@ -67,6 +67,7 @@
             pointer-events: auto;
             touch-action: none;
             transition: filter 1.8s var(--ease-cinematic), transform 1.8s var(--ease-cinematic);
+            display: block;
         }
 
         #webgl-canvas.dof-blur {
@@ -298,7 +299,7 @@
             opacity: 0;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            z-index: 100;
+            z-index: 100000;
             touch-action: manipulation;
         }
         .advance-btn:active {
@@ -344,6 +345,7 @@
             pointer-events: none;
             z-index: 5;
             transition: filter 1.5s var(--ease-cinematic);
+            display: block;
         }
         #canvas-particles.dof-blur {
             filter: blur(4px);
@@ -371,7 +373,8 @@
 
     <!-- SCENE 0: INITIATOR -->
     <div class="scene active" id="scene-0">
-        <div class="glow-dot" id="startJourney"></div>
+        <!-- Added role and tabindex for better iOS Safari touch responsiveness -->
+        <div class="glow-dot" id="startJourney" role="button" tabindex="0"></div>
     </div>
 
     <!-- SCENE 1: TITLE REVEAL -->
@@ -635,9 +638,19 @@
         }
 
         function onWindowResize() {
-            camera3D.aspect = window.innerWidth / window.innerHeight;
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            camera3D.aspect = w / h;
+            
+            // Fix 3: Keep elements centered correctly on mobile portrait views
+            if (camera3D.aspect < 1) {
+                camera3D.position.z = 15 / Math.sqrt(camera3D.aspect);
+            } else {
+                camera3D.position.z = 15;
+            }
+            
             camera3D.updateProjectionMatrix();
-            renderer3D.setSize(window.innerWidth, window.innerHeight);
+            renderer3D.setSize(w, h);
         }
 
         function build3DCake() {
@@ -776,6 +789,8 @@
                 isBouquetLoaded = true;
             }, undefined, (error) => {
                 console.error("Failed to load flower_bouquet.glb.", error);
+                // Fix: Allow interaction even if the 3D asset fails to load
+                isBouquetLoaded = true; 
             });
 
             boxGroup.add(bouquetContainer);
@@ -795,28 +810,21 @@
                 if (isCandleLit) {
                     candle1Flame.position.x = Math.sin(time * 6) * 0.015;
                     candle1Flame.position.z = Math.cos(time * 5) * 0.015;
-                    candle1Flame.scale.set(1 + Math.sin(time * 18) * 0.05, 2.2 + Math.random() * 0.15, 1 + Math.cos(time * 14) * 0.05);
-                    flame1Light.intensity = 1.5 + Math.random() * 0.5;
-                    
-                    candle8Flame.position.x = Math.sin(time * 7) * 0.015;
-                    candle8Flame.position.z = Math.cos(time * 4) * 0.015;
-                    candle8Flame.scale.set(1 + Math.sin(time * 15) * 0.05, 2.2 + Math.random() * 0.15, 1.66 + Math.cos(time * 12) * 0.05);
-                    flame8Light.intensity = 1.5 + Math.random() * 0.5;
+                    candle1Flame.scale.y = 1 + Math.sin(time * 12) * 0.08;
+                    flame1Light.intensity = 1.8 + Math.sin(time * 15) * 0.3;
 
-                    if (Math.random() < 0.1) {
-                        const px = window.innerWidth/2 + (Math.random()-0.5)*50;
-                        createParticles(px, window.innerHeight/2 - 50, '255, 180, 50', 1, 'ember');
-                    }
+                    candle8Flame.position.x = Math.cos(time * 6) * 0.015;
+                    candle8Flame.position.z = Math.sin(time * 5) * 0.015;
+                    candle8Flame.scale.y = 1 + Math.cos(time * 10) * 0.08;
+                    flame8Light.intensity = 1.8 + Math.cos(time * 13) * 0.3;
                 }
             }
 
             if (boxGroup.visible) {
-                boxGroup.rotation.y = Math.sin(time * 0.3) * 0.15;
-                
-                if (isBoxOpened && bouquetContainer.scale.x > 0.99) {
-                    bouquetContainer.rotation.y += (bouquetTargetRotY - bouquetContainer.rotation.y) * 0.08;
-                    bouquetContainer.rotation.x = Math.cos(time * 0.6) * 0.02;
-                    bouquetContainer.position.y = 1.0 + Math.sin(time * 1.5) * 0.08;
+                bouquetContainer.rotation.y += (bouquetTargetRotY - bouquetContainer.rotation.y) * 0.05;
+                if (isBoxOpened) {
+                    boxGroup.position.y += (0.5 - boxGroup.position.y) * 0.02;
+                    bouquetContainer.position.y += (1.8 - bouquetContainer.position.y) * 0.03;
                 }
             }
 
@@ -824,24 +832,68 @@
         }
 
         /****************************************************************
-         * 4. SCENE TRANSITIONS & STORY ENGINE
+         * 4. 2D CANVAS PARTICLES ENGINE (DUST & GLOWING MOTES)
          ****************************************************************/
-        let currentScene = 0;
-        const webglCanvas = document.getElementById('webgl-canvas');
-        const particleCanvas = document.getElementById('canvas-particles');
+        const canvas2D = document.getElementById('canvas-particles');
+        const ctx2D = canvas2D.getContext('2d');
+        let particles = [];
 
-        function toggleDOFBlur(enable) {
-            if (enable) {
-                webglCanvas.classList.add('dof-blur');
-                particleCanvas.classList.add('dof-blur');
-            } else {
-                webglCanvas.classList.remove('dof-blur');
-                particleCanvas.classList.remove('dof-blur');
+        function resize2DCanvas() {
+            canvas2D.width = window.innerWidth;
+            canvas2D.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor() {
+                this.reset();
+                this.y = Math.random() * canvas2D.height; 
+            }
+            reset() {
+                this.x = Math.random() * canvas2D.width;
+                this.y = canvas2D.height + 10;
+                this.size = Math.random() * 1.5 + 0.5;
+                this.speed = Math.random() * 0.8 + 0.2;
+                this.alpha = Math.random() * 0.5 + 0.1;
+                this.drift = (Math.random() - 0.5) * 0.5;
+            }
+            update() {
+                this.y -= this.speed;
+                this.x += this.drift;
+                if (this.y < -10) this.reset();
+            }
+            draw() {
+                ctx2D.fillStyle = `rgba(212, 175, 55, ${this.alpha})`;
+                ctx2D.beginPath();
+                ctx2D.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx2D.fill();
             }
         }
 
-        // Cleaned up, authoritative transition function to replace duplicates
+        function initParticles() {
+            resize2DCanvas();
+            window.addEventListener('resize', resize2DCanvas);
+            for (let i = 0; i < 70; i++) particles.push(new Particle());
+            animateParticles();
+        }
+
+        function animateParticles() {
+            ctx2D.clearRect(0, 0, canvas2D.width, canvas2D.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animateParticles);
+        }
+
+        /****************************************************************
+         * 5. SCENE DIRECTOR & INTERACTION LOGIC
+         ****************************************************************/
+        let currentScene = 0;
+        const activeTransitions = {};
+
         function transitionScene(from, to, delay = 0) {
+            // Fix: Robust deduplication of transitions
+            const transKey = `${from}_${to}`;
+            if (activeTransitions[transKey]) return;
+            activeTransitions[transKey] = true;
+
             setTimeout(() => {
                 const outScene = document.getElementById(`scene-${from}`);
                 const inScene = document.getElementById(`scene-${to}`);
@@ -857,22 +909,327 @@
                         inScene.classList.add('active');
                         triggerSceneLogic(to);
                     }
-                }, 1200); // Allow outScene to fade before activating inScene
+                }, 1200); 
             }, delay);
         }
 
-        // --- SINGLE RELIABLE HANDLER FOR YELLOW DOT ---
+        function triggerSceneLogic(sceneIndex) {
+            currentScene = sceneIndex;
+            
+            if (sceneIndex === 1) {
+                setTimeout(() => transitionScene(1, 1.5, 0), 4000);
+            } 
+            else if (sceneIndex === 1.5) {
+                const c1 = document.getElementById('cine-1');
+                const c2 = document.getElementById('cine-2');
+                const c3 = document.getElementById('cine-3');
+                
+                setTimeout(() => c1.classList.add('show'), 500);
+                setTimeout(() => c1.classList.remove('show'), 3500);
+                
+                setTimeout(() => c2.classList.add('show'), 5000);
+                setTimeout(() => c2.classList.remove('show'), 8000);
+                
+                setTimeout(() => c3.classList.add('show'), 9500);
+                setTimeout(() => transitionScene(1.5, 2, 6000), 10000);
+            }
+            else if (sceneIndex === 2) {
+                document.getElementById('webgl-canvas').classList.remove('dof-blur');
+                document.getElementById('canvas-particles').classList.remove('dof-blur');
+                cakeGroup.visible = true;
+                cakeGroup.position.y = -8; 
+                
+                let yPos = -8;
+                const rise = setInterval(() => {
+                    yPos += (-0.5 - yPos) * 0.05;
+                    cakeGroup.position.y = yPos;
+                    if (yPos > -0.55) {
+                        cakeGroup.position.y = -0.5;
+                        clearInterval(rise);
+                        startMicListener(); 
+                    }
+                }, 16);
+            }
+            else if (sceneIndex === 3) {
+                document.getElementById('ambientGlow').style.opacity = '1';
+                setTimeout(() => transitionScene(3, 4, 0), 5000);
+            }
+            else if (sceneIndex === 4) {
+                playQuoteSequence();
+            }
+            else if (sceneIndex === 5) {
+                cakeGroup.visible = false; 
+                boxGroup.visible = true;
+                boxGroup.position.y = -8;
+                
+                let yPos = -8;
+                const rise = setInterval(() => {
+                    yPos += (-1.5 - yPos) * 0.05;
+                    boxGroup.position.y = yPos;
+                    if (yPos > -1.55) {
+                        boxGroup.position.y = -1.5;
+                        clearInterval(rise);
+                    }
+                }, 16);
+            }
+            else if (sceneIndex === 6) {
+                boxGroup.visible = false;
+                document.getElementById('webgl-canvas').classList.add('dof-blur');
+                document.getElementById('canvas-particles').classList.add('dof-blur');
+                
+                const card = document.getElementById('glassCard');
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left - rect.width/2;
+                    const y = e.clientY - rect.top - rect.height/2;
+                    card.style.transform = `perspective(1000px) rotateY(${x * 0.02}deg) rotateX(${-y * 0.02}deg)`;
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = `perspective(1000px) rotateY(0deg) rotateX(0deg)`;
+                });
+
+                startTypewriter();
+            }
+        }
+
+        // --- MICROPHONE / BLOW DETECTION LOGIC ---
+        let audioContextMic, analyzer, microphone;
+        function startMicListener() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                    audioContextMic = new (window.AudioContext || window.webkitAudioContext)();
+                    analyzer = audioContextMic.createAnalyser();
+                    microphone = audioContextMic.createMediaStreamSource(stream);
+                    microphone.connect(analyzer);
+                    analyzer.fftSize = 256;
+                    
+                    const bufferLength = analyzer.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+                    
+                    function checkBlow() {
+                        if (!isCandleLit) return;
+                        analyzer.getByteFrequencyData(dataArray);
+                        let sum = 0;
+                        for (let i = 0; i < bufferLength; i++) {
+                            sum += dataArray[i];
+                        }
+                        const average = sum / bufferLength;
+                        
+                        if (average > 75) { 
+                            extinguishCandles();
+                            return;
+                        }
+                        requestAnimationFrame(checkBlow);
+                    }
+                    checkBlow();
+                }).catch(err => {
+                    console.log("Mic access denied or unavailable. Tap fallback is active.");
+                    document.getElementById('micHint').innerText = "المسي الشمعة بلطف";
+                });
+            } else {
+                document.getElementById('micHint').innerText = "المسي الشمعة بلطف";
+            }
+        }
+
+        function extinguishCandles() {
+            if (!isCandleLit) return;
+            isCandleLit = false;
+            playSoundCue('extinguish');
+            
+            let fade = 1.0;
+            const shrink = setInterval(() => {
+                fade -= 0.05;
+                candle1Flame.scale.set(fade, fade * 2.2, fade);
+                candle8Flame.scale.set(fade, fade * 2.2, fade * 1.66);
+                flame1Light.intensity = fade * 1.8;
+                flame8Light.intensity = fade * 1.8;
+                candle1Flame.material.opacity = fade;
+                candle8Flame.material.opacity = fade;
+                
+                if (fade <= 0) {
+                    clearInterval(shrink);
+                    candle1Flame.visible = false;
+                    candle8Flame.visible = false;
+                    flame1Light.intensity = 0;
+                    flame8Light.intensity = 0;
+                    
+                    setTimeout(() => transitionScene(2, 3, 0), 1500);
+                }
+            }, 30);
+        }
+
+        // --- QUOTES SEQUENCE ---
+        function playQuoteSequence() {
+            const qTarget = document.getElementById('quoteText');
+            let qIdx = 0;
+            
+            function nextQuote() {
+                if (qIdx >= QUOTES.length) {
+                    transitionScene(4, 5, 1000);
+                    return;
+                }
+                qTarget.style.opacity = '0';
+                qTarget.style.transform = 'translateY(15px)';
+                
+                setTimeout(() => {
+                    qTarget.innerHTML = QUOTES[qIdx].replace(/\n/g, '<br>');
+                    qTarget.style.opacity = '1';
+                    qTarget.style.transform = 'translateY(0)';
+                    qIdx++;
+                    setTimeout(nextQuote, 5500);
+                }, 1500);
+            }
+            nextQuote();
+        }
+
+        // --- BOX OPENING LOGIC ---
+        function executeBoxOpening() {
+            if (isBoxOpened) return;
+            isBoxOpened = true;
+            playSoundCue('giftOpen');
+
+            document.getElementById('giftText').style.opacity = '0';
+
+            let rotX = 0;
+            const openLid = setInterval(() => {
+                rotX -= 0.04;
+                boxLidGroup.rotation.x = rotX;
+                if (rotX < -Math.PI / 2.2) {
+                    clearInterval(openLid);
+                }
+            }, 16);
+
+            let scale = 0;
+            const growBouquet = setInterval(() => {
+                scale += 0.015;
+                bouquetContainer.scale.set(scale, scale, scale);
+                bouquetTargetRotY += 0.02;
+                if (scale >= 1.0) {
+                    bouquetContainer.scale.set(1, 1, 1);
+                    clearInterval(growBouquet);
+                    
+                    setTimeout(() => {
+                        const btn = document.getElementById('btn-scene5');
+                        btn.style.opacity = '1';
+                        btn.style.pointerEvents = 'auto'; // ensure clickability
+                    }, 1500);
+                }
+            }, 25);
+        }
+
+        // --- TYPEWRITER LOGIC ---
+        function startTypewriter() {
+            const target = document.getElementById('typewriterTarget');
+            const card = document.getElementById('glassCard');
+            let idx = 0;
+            
+            function typeChar() {
+                if (idx < FINAL_LETTER_ARABIC.length) {
+                    target.innerHTML += FINAL_LETTER_ARABIC.charAt(idx);
+                    if(idx % 3 === 0) playSoundCue('typeKey');
+                    
+                    if (idx % 15 === 0) {
+                        card.scrollTop = card.scrollHeight;
+                    }
+
+                    idx++;
+                    let delay = 35 + Math.random() * 25; 
+                    if (FINAL_LETTER_ARABIC.charAt(idx-1) === '.' || FINAL_LETTER_ARABIC.charAt(idx-1) === '\n') {
+                        delay = 400;
+                    }
+                    setTimeout(typeChar, delay);
+                } else {
+                    card.scrollTop = card.scrollHeight;
+                    setTimeout(() => {
+                        const btn = document.getElementById('btn-scene6');
+                        btn.style.opacity = '1';
+                        btn.style.pointerEvents = 'auto';
+                    }, 2000);
+                }
+            }
+            setTimeout(typeChar, 1000);
+        }
+
+        // --- INPUT HANDLING ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const webglCanvas = document.getElementById('webgl-canvas');
+
+        const handlePointerDown = (event) => {
+            if (currentScene === 0) return;
+
+            // Fix 8 & 9: Strictly isolate HTML UI events from Three.js raycasting
+            if (event.target !== webglCanvas) {
+                return;
+            }
+
+            let clientX, clientY;
+            if (event.touches && event.touches.length > 0) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera3D);
+
+            if (currentScene === 2 && isCandleLit) {
+                const intersects = raycaster.intersectObjects(interactiveCandleMeshes, true);
+                if (intersects.length > 0) {
+                    extinguishCandles();
+                }
+            }
+            
+            if (currentScene === 5 && !isBoxOpened) {
+                const intersects = raycaster.intersectObject(boxGroup, true);
+                if (intersects.length > 0) {
+                    executeBoxOpening();
+                }
+            }
+        };
+
+        window.addEventListener('pointerdown', handlePointerDown);
+        window.addEventListener('touchstart', handlePointerDown, { passive: true });
+
+        // --- FIX 5, 6, 7 & 10: Cleanly bind advance buttons via standard click ---
+        function bindAdvanceButton(btnId, fromScene, toScene) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (btn.dataset.clicked) return;
+                btn.dataset.clicked = "true";
+                
+                btn.style.opacity = '0';
+                btn.style.pointerEvents = 'none';
+                transitionScene(fromScene, toScene, 0);
+            });
+        }
+
+        bindAdvanceButton('btn-scene5', 5, 6);
+        bindAdvanceButton('btn-scene6', 6, 7);
+
+        // --- BOOTSTRAP ---
+        initThreeJS();
+        initParticles();
+
         const startBtn = document.getElementById('startJourney');
         let hasJourneyStarted = false;
 
         function handleStartJourney(e) {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
+            e.preventDefault();
+            e.stopPropagation();
 
             if (hasJourneyStarted) return;
             hasJourneyStarted = true;
+            
+            startBtn.style.pointerEvents = 'none'; 
 
             initAudio();
             bgMusic.volume = 0;
@@ -887,510 +1244,13 @@
                 });
             }
 
-            transitionScene(0, 1, 0);
+            // Fix 2: Always transition regardless of audio failure
+            transitionScene(0, 1, 0); 
         }
 
-        // Bind cleanly to click and touchstart to satisfy Safari Autoplay
+        // Fix 1 & 10: Only use click event, iOS Safari `touch-action: manipulation` prevents delays
         startBtn.addEventListener('click', handleStartJourney);
-        startBtn.addEventListener('touchstart', handleStartJourney, { passive: false });
 
-
-        // Clean generic binder for transition buttons to avoid interference
-        function bindAdvanceButton(btnId, fromScene, toScene) {
-            const btn = document.getElementById(btnId);
-            if (!btn) return;
-            const handler = (e) => {
-                if (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-                btn.style.opacity = '0';
-                btn.style.pointerEvents = 'none';
-                transitionScene(fromScene, toScene, 0);
-            };
-            btn.addEventListener('click', handler);
-            btn.addEventListener('touchstart', handler, { passive: false });
-        }
-
-        bindAdvanceButton('btn-scene5', 5, 6);
-        bindAdvanceButton('btn-scene6', 6, 7);
-
-        function triggerSceneLogic(sceneNum) {
-            currentScene = sceneNum;
-            
-            if (sceneNum === 1) {
-                document.getElementById('ambientGlow').style.opacity = '0.35';
-                toggleDOFBlur(true);
-                transitionScene(1, '1-5', 4000);
-            }
-            else if (sceneNum === '1-5') {
-                document.getElementById('cine-1').classList.add('show');
-                setTimeout(() => {
-                    document.getElementById('cine-1').classList.remove('show');
-                    setTimeout(() => {
-                        document.getElementById('cine-2').classList.add('show');
-                        setTimeout(() => {
-                            document.getElementById('cine-2').classList.remove('show');
-                            setTimeout(() => {
-                                document.getElementById('cine-3').classList.add('show');
-                                setTimeout(() => {
-                                    transitionScene('1-5', 2);
-                                }, 6000);
-                            }, 1500);
-                        }, 2500);
-                    }, 1500);
-                }, 2500);
-            }
-            else if (sceneNum === 2) {
-                cakeGroup.visible = true;
-                toggleDOFBlur(false);
-                initMic();
-                document.getElementById('ambientGlow').style.opacity = '0.2';
-            }
-            else if (sceneNum === 3) {
-                toggleDOFBlur(true);
-                transitionScene(3, 4, 5500);
-            }
-            else if (sceneNum === 4) {
-                playQuotesSequence();
-            }
-            else if (sceneNum === 5) {
-                cakeGroup.visible = false;
-                boxGroup.visible = true;
-                toggleDOFBlur(false);
-                document.getElementById('ambientGlow').style.opacity = '0.2';
-            }
-            else if (sceneNum === 6) {
-                boxGroup.visible = false;
-                document.getElementById('ambientGlow').style.opacity = '0.55';
-                toggleDOFBlur(true);
-                setupGlassCardParallax();
-                setTimeout(startTypewriter, 1200);
-            }
-            else if (sceneNum === 7) {
-                document.getElementById('ambientGlow').style.opacity = '0.15';
-            }
-        }
-
-        /****************************************************************
-         * 5. OPTIMIZED INTERACTION & SWIPE & RAYCASTING
-         ****************************************************************/
-        const raycaster = new THREE.Raycaster();
-        const pointer = new THREE.Vector2();
-        
-        let isDragging = false;
-        let previousX = 0;
-
-        const getEventX = (e) => {
-            if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
-            if (e.changedTouches && e.changedTouches.length > 0) return e.changedTouches[0].clientX;
-            return e.clientX;
-        };
-
-        const handlePointerDown = (event) => {
-            if (currentScene === 0) return;
-
-            // Immediately exit if the user tapped a UI button to avoid intercepting HTML interaction
-            if (event.target.tagName.toLowerCase() === 'button' || event.target.closest('.advance-btn')) {
-                return;
-            }
-
-            if (bgMusic.paused && !isMuted) {
-                try {
-                    const playPromise = bgMusic.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => fadeAudio(0.6, 1000)).catch(()=>{});
-                    }
-                } catch(error) {}
-            }
-
-            const clientX = getEventX(event);
-            let clientY = event.touches ? event.touches[0].clientY : event.clientY;
-
-            if (currentScene === 5 && isBoxOpened) {
-                isDragging = true;
-                previousX = clientX;
-            }
-
-            pointer.x = (clientX / window.innerWidth) * 2 - 1;
-            pointer.y = -(clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(pointer, camera3D);
-
-            if (currentScene === 2 && isCandleLit) {
-                const intersects = raycaster.intersectObjects(interactiveCandleMeshes, false);
-                if (intersects.length > 0) extinguishCandle();
-            }
-            
-            if (currentScene === 5 && !isBoxOpened) {
-                if (!isBouquetLoaded) return; 
-                const boxInteractables = [boxBody, boxLid];
-                const intersects = raycaster.intersectObjects(boxInteractables, false);
-                if (intersects.length > 0) executeBoxOpening();
-            }
-        };
-
-        const handlePointerMove = (event) => {
-            if (isDragging && currentScene === 5 && bouquetContainer) {
-                const currentX = getEventX(event);
-                const deltaX = currentX - previousX;
-                bouquetTargetRotY += deltaX * 0.006;
-                previousX = currentX;
-            }
-            if (currentScene === 6) {
-                const cx = getEventX(event);
-                const cy = event.touches ? event.touches[0].clientY : event.clientY;
-                updateGlassCardTransform(cx, cy);
-            }
-        };
-
-        const handlePointerUp = () => { isDragging = false; };
-
-        window.addEventListener('pointerdown', handlePointerDown, { passive: false });
-        window.addEventListener('touchstart', handlePointerDown, { passive: false });
-        window.addEventListener('pointermove', handlePointerMove, { passive: false });
-        window.addEventListener('touchmove', handlePointerMove, { passive: false });
-        window.addEventListener('pointerup', handlePointerUp);
-        window.addEventListener('touchend', handlePointerUp);
-        window.addEventListener('pointercancel', handlePointerUp);
-
-        /****************************************************************
-         * 6. MECHANICS: MIC BLOW & CANDLE EXTINGUISH
-         ****************************************************************/
-        let audioContextMic = null, analyzer = null, microphone = null, micProcessor = null;
-
-        async function initMic() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                audioContextMic = new (window.AudioContext || window.webkitAudioContext)();
-                analyzer = audioContextMic.createAnalyser();
-                microphone = audioContextMic.createMediaStreamSource(stream);
-                micProcessor = audioContextMic.createScriptProcessor(512, 1, 1);
-                
-                analyzer.smoothingTimeConstant = 0.5;
-                analyzer.fftSize = 256;
-                
-                microphone.connect(analyzer);
-                analyzer.connect(micProcessor);
-                micProcessor.connect(audioContextMic.destination);
-                
-                micProcessor.onaudioprocess = () => {
-                    if(!isCandleLit || currentScene !== 2) return;
-                    const array = new Uint8Array(analyzer.frequencyBinCount);
-                    analyzer.getByteFrequencyData(array);
-                    const avg = array.reduce((a, b) => a + b) / array.length;
-                    
-                    if (avg > 75) extinguishCandle();
-                };
-            } catch (err) {
-                console.warn("Microphone access denied. Tap candle to extinguish.");
-            }
-        }
-
-        function extinguishCandle() {
-            if(!isCandleLit) return;
-            isCandleLit = false;
-            
-            if(micProcessor) micProcessor.disconnect();
-            if(microphone) microphone.disconnect();
-            
-            playSoundCue('extinguish');
-
-            const startIntensity1 = flame1Light.intensity;
-            const startIntensity8 = flame8Light.intensity;
-            const startScale1 = candle1Flame.scale.y;
-            const startScale8 = candle8Flame.scale.y;
-            
-            let frame = 0;
-            const extinguisAnim = setInterval(() => {
-                frame++;
-                const decay = 1 - frame/30;
-                
-                flame1Light.intensity = startIntensity1 * decay;
-                flame8Light.intensity = startIntensity8 * decay;
-                candle1Flame.scale.setY(startScale1 * decay);
-                candle8Flame.scale.setY(startScale8 * decay);
-                candle1Flame.material.opacity = decay;
-                
-                if (frame >= 30) {
-                    clearInterval(extinguisAnim);
-                    candle1Group.remove(candle1Flame);
-                    candle1Group.remove(flame1Light);
-                    candle8Group.remove(candle8Flame);
-                    candle8Group.remove(flame8Light);
-                    
-                    for(let i=0; i<25; i++) {
-                        createParticles(window.innerWidth/2 - 40, window.innerHeight/2 - 60, '200, 200, 200', 1, 'smoke');
-                        createParticles(window.innerWidth/2 + 40, window.innerHeight/2 - 60, '200, 200, 200', 1, 'smoke');
-                    }
-                    
-                    document.getElementById('micHint').style.opacity = '0';
-                    setTimeout(() => transitionScene(2, 3), 1800);
-                }
-            }, 16);
-        }
-
-        /****************************************************************
-         * 7. MECHANICS: GIFT BOX OPENING
-         ****************************************************************/
-        function executeBoxOpening() {
-            isBoxOpened = true;
-            document.getElementById('giftText').style.opacity = '0';
-            playSoundCue('giftOpen');
-
-            let progress = 0;
-            const openAnim = setInterval(() => {
-                progress += 0.012;
-                if (progress >= 1) {
-                    clearInterval(openAnim);
-                    const btn = document.getElementById('btn-scene5');
-                    btn.style.opacity = '1';
-                    btn.style.pointerEvents = 'auto';
-                }
-
-                const easeLid = 1 - Math.pow(1 - progress, 3);
-                boxLidGroup.rotation.x = -easeLid * (Math.PI * 0.55);
-
-                if (progress > 0.2) {
-                    let scaleProgress = (progress - 0.2) / 0.8;
-                    scaleProgress = 1 - Math.pow(1 - scaleProgress, 3);
-                    
-                    if (bouquetContainer) {
-                        bouquetContainer.scale.set(scaleProgress, scaleProgress, scaleProgress);
-                        bouquetContainer.position.y = -1.5 + scaleProgress * 2.5; 
-                    }
-                    
-                    if(Math.random() < 0.3) {
-                        createParticles(
-                            window.innerWidth/2 + (Math.random()-0.5)*120,
-                            window.innerHeight/2 + (Math.random()-0.5)*120,
-                            '212, 175, 55', 1, 'gold'
-                        );
-                    }
-                }
-            }, 16);
-        }
-
-        /****************************************************************
-         * 8. SCENE 4: ARABIC QUOTES ENGINE
-         ****************************************************************/
-        function playQuotesSequence() {
-            const quoteEl = document.getElementById('quoteText');
-            let qIdx = 0;
-
-            const showNextQuote = () => {
-                if (qIdx >= QUOTES.length) {
-                    transitionScene(4, 5);
-                    return;
-                }
-                
-                quoteEl.style.opacity = '0';
-                quoteEl.style.transform = 'translateY(15px)';
-                
-                setTimeout(() => {
-                    quoteEl.innerText = QUOTES[qIdx].replace(/\n/g, '\n');
-                    quoteEl.style.opacity = '1';
-                    quoteEl.style.transform = 'translateY(0)';
-                    qIdx++;
-                    
-                    setTimeout(showNextQuote, 5500);
-                }, 1000);
-            };
-
-            showNextQuote();
-        }
-
-        /****************************************************************
-         * 9. SCENE 6: TYPEWRITER & 3D PARALLAX CARD
-         ****************************************************************/
-        let isTypingFinished = false;
-        
-        function setupGlassCardParallax() {
-            const card = document.getElementById('glassCard');
-            card.addEventListener('click', () => {
-                if (currentScene === 6 && !isTypingFinished) {
-                    isTypingFinished = true;
-                }
-            });
-        }
-
-        function updateGlassCardTransform(x, y) {
-            const card = document.getElementById('glassCard');
-            if(!card) return;
-            const cx = window.innerWidth / 2;
-            const cy = window.innerHeight / 2;
-            const rotX = ((y - cy) / cy) * -6;
-            const rotY = ((x - cx) / cx) * 6;
-            card.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1, 1, 1)`;
-        }
-
-        function startTypewriter() {
-            const target = document.getElementById('typewriterTarget');
-            const card = document.getElementById('glassCard');
-            let i = 0;
-            target.innerHTML = '';
-            
-            function type() {
-                if (isTypingFinished) {
-                    target.innerHTML = FINAL_LETTER_ARABIC.replace(/\n/g, '<br>');
-                    card.scrollTop = card.scrollHeight;
-                    document.querySelector('.cursor').style.display = 'none';
-                    
-                    const btn = document.getElementById('btn-scene6');
-                    btn.style.opacity = '1';
-                    btn.style.pointerEvents = 'auto';
-                    return;
-                }
-
-                if (i < FINAL_LETTER_ARABIC.length) {
-                    const char = FINAL_LETTER_ARABIC.charAt(i);
-                    if (char === '\n') {
-                        target.innerHTML += '<br>';
-                    } else {
-                        target.innerHTML += char;
-                        if(Math.random() < 0.2) playSoundCue('typeKey');
-                    }
-                    
-                    if (i % 20 === 0) {
-                        card.scrollTo({ top: card.scrollHeight, behavior: 'smooth' });
-                    }
-                    
-                    i++;
-                    
-                    let speed = 40 + Math.random() * 30;
-                    if (char === '.' || char === '،' || char === '\n') speed = 400; 
-                    
-                    setTimeout(type, speed);
-                } else {
-                    isTypingFinished = true;
-                    document.querySelector('.cursor').style.display = 'none';
-                    
-                    const btn = document.getElementById('btn-scene6');
-                    btn.style.opacity = '1';
-                    btn.style.pointerEvents = 'auto';
-                }
-            }
-            type();
-        }
-
-        /****************************************************************
-         * 10. 2D CINEMATIC PARTICLES ENGINE
-         ****************************************************************/
-        const pCanvas = document.getElementById('canvas-particles');
-        const pCtx = pCanvas.getContext('2d', { alpha: true });
-        pCanvas.width = window.innerWidth;
-        pCanvas.height = window.innerHeight;
-
-        let particles = [];
-        
-        function createParticles(x, y, colorStr, count, type = 'ember') {
-            for(let i=0; i<count; i++) {
-                particles.push({
-                    x: x, y: y,
-                    vx: (Math.random() - 0.5) * (type==='smoke'? 1.5 : 2.5),
-                    vy: (Math.random() - 0.5) * (type==='smoke'? 1.5 : 2.5) - (type==='smoke'? 2:1),
-                    life: 1.0,
-                    decay: 0.01 + Math.random() * 0.02,
-                    size: type==='smoke' ? (4 + Math.random()*8) : (1 + Math.random()*2),
-                    color: colorStr,
-                    type: type
-                });
-            }
-        }
-
-        setInterval(() => {
-            if(Math.random() < 0.3) {
-                createParticles(Math.random()*window.innerWidth, window.innerHeight + 10, '212, 175, 55', 1, 'gold');
-            }
-        }, 150);
-
-        setInterval(() => {
-            if (currentScene !== 7) return;
-            
-            let px = Math.random() < 0.5 
-                     ? Math.random() * (window.innerWidth * 0.3) 
-                     : window.innerWidth - (Math.random() * (window.innerWidth * 0.3));
-                     
-            particles.push({
-                x: px, 
-                y: -50,
-                vx: (Math.random() - 0.5) * 1.5,
-                vy: 1.5 + Math.random() * 2.5,
-                life: 1.0,
-                decay: 0,
-                size: 8 + Math.random() * 8,
-                rot: Math.random() * Math.PI * 2,
-                rotSpeed: (Math.random() - 0.5) * 0.08,
-                flip: Math.random() * Math.PI,
-                flipSpeed: (Math.random() - 0.5) * 0.05,
-                color: '120, 5, 15',
-                type: 'petal'
-            });
-        }, 120);
-
-        function animateParticles() {
-            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-            
-            for(let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life -= p.decay;
-                
-                if (p.type === 'smoke') {
-                    p.size += 0.2;
-                    p.x += Math.sin(p.life * 10) * 0.5;
-                } else if (p.type === 'gold') {
-                    p.x += Math.sin(p.y * 0.05) * 0.8;
-                }
-                
-                if (p.life <= 0 || p.y > window.innerHeight + 50) {
-                    particles.splice(i, 1);
-                } else {
-                    if (p.type === 'petal') {
-                        pCtx.save();
-                        pCtx.translate(p.x, p.y);
-                        pCtx.rotate(p.rot);
-                        pCtx.scale(1, Math.cos(p.flip));
-                        
-                        pCtx.beginPath();
-                        pCtx.moveTo(0, -p.size);
-                        pCtx.bezierCurveTo(p.size, -p.size, p.size, p.size, 0, p.size);
-                        pCtx.bezierCurveTo(-p.size, p.size, -p.size, -p.size, 0, -p.size);
-                        
-                        pCtx.fillStyle = `rgba(${p.color}, 0.95)`;
-                        pCtx.shadowBlur = 10;
-                        pCtx.shadowColor = `rgba(0, 0, 0, 0.4)`;
-                        pCtx.fill();
-                        
-                        pCtx.restore();
-                        
-                        p.rot += p.rotSpeed;
-                        p.flip += p.flipSpeed;
-                    } else {
-                        pCtx.beginPath();
-                        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                        pCtx.fillStyle = `rgba(${p.color}, ${p.life})`;
-                        
-                        if (p.type === 'ember') {
-                            pCtx.shadowBlur = 10;
-                            pCtx.shadowColor = `rgb(${p.color})`;
-                        } else {
-                            pCtx.shadowBlur = 0;
-                        }
-                        pCtx.fill();
-                    }
-                }
-            }
-            requestAnimationFrame(animateParticles);
-        }
-
-        window.addEventListener('resize', () => {
-            pCanvas.width = window.innerWidth;
-            pCanvas.height = window.innerHeight;
-        });
-
-        initThreeJS();
-        animateParticles();
     </script>
 </body>
 </html>
