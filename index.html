@@ -848,7 +848,15 @@
             }, delay);
         }
 
-        document.getElementById('startJourney').addEventListener('click', () => {
+        // --- BUG FIX: EVENT LISTENER HANDLING ---
+        // Bound safely to pointerdown and touchstart to guarantee firing before browser can consume the gesture.
+        let hasJourneyStarted = false;
+        const startBtn = document.getElementById('startJourney');
+
+        const startSequenceHandler = () => {
+            if (hasJourneyStarted) return;
+            hasJourneyStarted = true;
+
             initAudio();
             
             // Isolate audio playback so failures do NOT block the scene transition
@@ -872,9 +880,13 @@
                 console.warn("Audio execution error:", error);
             }
             
-            // This will now ALWAYS execute, even if audio/mic is blocked
+            // This will now ALWAYS execute cleanly and independently of browser event-drops
             transitionScene(0, 1);
-        });
+        };
+
+        startBtn.addEventListener('pointerdown', startSequenceHandler);
+        startBtn.addEventListener('touchstart', startSequenceHandler, { passive: true });
+        startBtn.addEventListener('click', startSequenceHandler);
 
         // Manual Buttons logic
         document.getElementById('btn-scene5').addEventListener('click', () => {
